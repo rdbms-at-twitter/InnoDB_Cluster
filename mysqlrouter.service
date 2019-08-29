@@ -1,0 +1,87 @@
+#!/bin/bash
+
+# chkconfig: - 78 30
+# Description: Start / Stop MySQL Router
+
+daemon=/usr/bin/mysqlrouter
+basedir=/etc/mysqlrouter
+piddir=/var/run/mysqlrouter
+mysqlrouter_pid=/var/run/mysqlrouter/mysqlrouter.pid
+
+. /etc/init.d/functions
+
+start() {
+           [ -d $piddir ] || [ -L $piddir ] || install -d -m 0750 -o mysqlrouter -g mysqlrouter ${piddir}
+           export ROUTER_PID=$mysqlrouter_pid
+           daemon $daemon -c $basedir/mysqlrouter.conf --user=mysqlrouter >/dev/null 2>&1 &
+           ret=$?
+           if [ $ret -eq "0" ]; then
+              action $"MySQL Routerは開始されました" /bin/true
+              touch /var/lock/subsys/mysqlrouter
+           else
+              action "MySQL Routerの起動に失敗しました" /bin/false
+            fi
+           return $ret
+        }
+
+stop() {
+        [ -f /var/lock/subsys/mysqlrouter ] || return 0
+        killproc mysqlrouter > /dev/null 2>&1
+        ret=$?
+        if [ $ret -eq "0" ]; then
+               rm -f $mysqlrouter_pid
+               rm -f /var/lock/subsys/mysqlrouter
+               action "MySQL Routerは停止されました" /bin/true
+        else
+               action "MySQL Routerは実行されていません" /bin/false
+        fi
+        }
+
+
+restart() {
+         stop
+         start  
+         }
+
+condrestart () {
+    [ -e /var/lock/subsys/mysqlrouter ] && restart || return 0
+         }
+
+
+status() {
+         if [ -f $mysqlrouter_pid ]; then
+            echo "MySQL Routerは実行中です" 
+         else
+            echo "MySQL Routerは停止中です" 
+         fi
+         }
+
+case "$1" in
+    start)
+        start
+        sleep 1
+        ;;
+     stop)
+        stop
+        sleep 1
+        ;;
+    restart)
+        restart
+        sleep 1
+        ;;
+    condrestart|try-restart)
+        condrestart
+        sleep 1
+        ;;
+    reload)
+        exit 3
+        ;;
+    status)
+        status
+        ;;
+    *)
+        echo "利用方法: $0 {start|stop|restart|condrestart|try-restart|reload|status}" 
+        exit 2
+esac
+
+exit $?
